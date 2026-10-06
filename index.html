@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DevVault - Zero-Knowledge Secrets Manager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
+
+  <!-- TOPBAR -->
+  <header class="bg-slate-800/80 border-b border-slate-700 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-50">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-bold">
+        🛡️
+      </div>
+      <h1 class="text-xl font-bold tracking-tight text-white">Dev<span class="text-emerald-400">Vault</span></h1>
+    </div>
+    <div id="authActions" class="hidden flex items-center gap-3">
+      <span id="userEmailBadge" class="text-xs bg-slate-700 text-slate-300 px-3 py-1.5 rounded-full border border-slate-600"></span>
+      <button onclick="lockVault()" class="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/30 px-3 py-1.5 rounded-md hover:bg-amber-500/20 transition">
+        🔒 Kunci Vault
+      </button>
+      <button onclick="handleLogout()" class="text-xs bg-rose-500/10 text-rose-400 border border-rose-500/30 px-3 py-1.5 rounded-md hover:bg-rose-500/20 transition">
+        Logout
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6">
+
+    <!-- STEP 1: LOGIN / REGISTER SUPABASE AUTH -->
+    <section id="authSection" class="max-w-md mx-auto my-12 bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-xl">
+      <h2 class="text-2xl font-bold text-center mb-2">Masuk ke DevVault</h2>
+      <p class="text-xs text-slate-400 text-center mb-6">Autentikasi akun via Supabase</p>
+
+      <form id="authForm" onsubmit="handleAuth(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Email</label>
+          <input type="email" id="authEmail" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none" placeholder="nama@gmail.com" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Password Akun</label>
+          <input type="password" id="authPassword" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none" placeholder="••••••••" />
+        </div>
+        <div class="flex gap-2 pt-2">
+          <button type="submit" id="btnLogin" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 rounded-lg text-sm transition">
+            Login
+          </button>
+          <button type="button" onclick="handleSignUp()" class="px-4 bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium py-2 rounded-lg text-sm transition">
+            Daftar Baru
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- STEP 2: MASTER PASSWORD UNLOCK -->
+    <section id="unlockSection" class="hidden max-w-md mx-auto my-12 bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-xl">
+      <div class="text-center mb-6">
+        <div class="text-4xl mb-2">🔐</div>
+        <h2 class="text-2xl font-bold">Buka Brankas Enkripsi</h2>
+        <p class="text-xs text-slate-400 mt-1">
+          Master password dipakai lokal di browser untuk dekripsi (tidak dikirim ke Supabase).
+        </p>
+      </div>
+
+      <form onsubmit="handleUnlock(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Master Password</label>
+          <input type="password" id="masterPasswordInput" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none" placeholder="Kunci master utama kamu..." />
+        </div>
+        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 rounded-lg text-sm transition">
+          Buka Vault
+        </button>
+      </form>
+    </section>
+
+    <!-- STEP 3: MAIN APP (TABS & CONTENT) -->
+    <section id="appSection" class="hidden space-y-6">
+      <!-- NAVIGATION TABS -->
+      <nav class="flex border-b border-slate-700 gap-2 pb-2">
+        <button onclick="switchTab('tabVault')" id="btnTabVault" class="tab-btn px-4 py-2 text-sm font-semibold rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+          📦 Vault
+        </button>
+        <button onclick="switchTab('tabGenerator')" id="btnTabGenerator" class="tab-btn px-4 py-2 text-sm font-semibold rounded-lg text-slate-400 hover:text-white">
+          ⚡ Password Generator
+        </button>
+        <button onclick="switchTab('tabDevSecrets')" id="btnTabDevSecrets" class="tab-btn px-4 py-2 text-sm font-semibold rounded-lg text-slate-400 hover:text-white">
+          🛠️️ Dev Secrets & .env
+        </button>
+        <button onclick="switchTab('tabSettings')" id="btnTabSettings" class="tab-btn px-4 py-2 text-sm font-semibold rounded-lg text-slate-400 hover:text-white">
+          ⚙️ Settings
+        </button>
+      </nav>
+
+      <!-- TAB 1: VAULT -->
+      <div id="tabVault" class="tab-content space-y-4">
+        <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
+          <input type="text" id="searchInput" oninput="renderVaultList()" placeholder="Cari project, email, atau tag..." class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none flex-1 max-w-sm" />
+          <button onclick="openModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition flex items-center justify-center gap-1.5">
+            <span>+</span> Tambah Kredensial
+          </button>
+        </div>
+
+        <div id="vaultList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Items will be injected here -->
+        </div>
+      </div>
+
+      <!-- TAB 2: GENERATOR -->
+      <div id="tabGenerator" class="tab-content hidden max-w-lg mx-auto bg-slate-800 p-6 rounded-2xl border border-slate-700 space-y-5">
+        <h3 class="text-lg font-bold">Password Generator</h3>
+        <div class="flex gap-2">
+          <input type="text" id="genResult" readonly class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono text-emerald-400" />
+          <button onclick="copyToClipboard(document.getElementById('genResult').value, 'Password disalin!')" class="bg-slate-700 hover:bg-slate-600 text-xs px-3 rounded-lg">Copy</button>
+          <button onclick="generatePassword()" class="bg-emerald-600 hover:bg-emerald-500 text-xs px-3 rounded-lg">Re-roll</button>
+        </div>
+        <div class="space-y-3 text-sm">
+          <div class="flex justify-between items-center">
+            <span>Panjang Karakter: <b id="lenDisplay">18</b></span>
+            <input type="range" id="genLength" min="8" max="40" value="18" oninput="document.getElementById('lenDisplay').innerText = this.value; generatePassword()" class="w-40" />
+          </div>
+          <label class="flex items-center gap-2"><input type="checkbox" id="genUpper" checked onchange="generatePassword()" /> Huruf Besar (A-Z)</label>
+          <label class="flex items-center gap-2"><input type="checkbox" id="genLower" checked onchange="generatePassword()" /> Huruf Kecil (a-z)</label>
+          <label class="flex items-center gap-2"><input type="checkbox" id="genNumbers" checked onchange="generatePassword()" /> Angka (0-9)</label>
+          <label class="flex items-center gap-2"><input type="checkbox" id="genSymbols" checked onchange="generatePassword()" /> Simbol Khusus (!@#$%^&*)</label>
+        </div>
+      </div>
+
+      <!-- TAB 3: DEV SECRETS (.ENV HELPER) -->
+      <div id="tabDevSecrets" class="tab-content hidden max-w-2xl mx-auto bg-slate-800 p-6 rounded-2xl border border-slate-700 space-y-4">
+        <h3 class="text-lg font-bold">Pilih Kredensial Proyek untuk Export ke .env</h3>
+        <p class="text-xs text-slate-400">Pilih item vault yang memiliki URL dan API Keys untuk di-generate otomatis ke format .env</p>
+        <select id="envSelectProject" onchange="generateEnvSnippet()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none">
+          <option value="">-- Pilih Project --</option>
+        </select>
+        <textarea id="envOutput" readonly rows="6" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs font-mono text-emerald-300" placeholder="Pilih project di atas untuk melihat isi .env..."></textarea>
+        <button onclick="copyToClipboard(document.getElementById('envOutput').value, 'Format .env disalin!')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition">
+          Copy Format .env
+        </button>
+      </div>
+
+      <!-- TAB 4: SETTINGS -->
+      <div id="tabSettings" class="tab-content hidden max-w-lg mx-auto bg-slate-800 p-6 rounded-2xl border border-slate-700 space-y-6">
+        <div>
+          <h3 class="text-lg font-bold">Settings & Keamanan</h3>
+          <p class="text-xs text-slate-400">Kelola brankas lokal dan backup data</p>
+        </div>
+        <div class="space-y-4">
+          <div class="flex items-center justify-between p-4 bg-slate-900/60 rounded-xl border border-slate-700/60">
+            <div>
+              <p class="text-sm font-semibold">Kunci Vault Sekarang</p>
+              <p class="text-xs text-slate-400">Hapus kunci enkripsi dari RAM browser</p>
+            </div>
+            <button onclick="lockVault()" class="bg-amber-600 hover:bg-amber-500 text-white text-xs px-3 py-2 rounded-lg">Kunci</button>
+          </div>
+          <div class="flex items-center justify-between p-4 bg-slate-900/60 rounded-xl border border-slate-700/60">
+            <div>
+              <p class="text-sm font-semibold">Backup Vault (Encrypted JSON)</p>
+              <p class="text-xs text-slate-400">Download ciphertext aman untuk cadangan</p>
+            </div>
+            <button onclick="exportVaultBackup()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs px-3 py-2 rounded-lg">Download</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL ADD / EDIT VAULT ITEM -->
+  <div id="vaultModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-slate-800 border border-slate-700 max-w-lg w-full rounded-2xl p-6 space-y-4 shadow-2xl">
+      <h3 id="modalTitle" class="text-lg font-bold">Tambah Kredensial Baru</h3>
+      <form id="vaultForm" onsubmit="saveVaultItem(event)" class="space-y-3 text-sm">
+        <input type="hidden" id="itemId" />
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Judul / Nama Proyek</label>
+          <input type="text" id="itemTitle" required placeholder="Misal: Kios IDEP POS" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 focus:border-emerald-500 focus:outline-none" />
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Email / Username</label>
+            <input type="text" id="itemEmail" placeholder="nama+pos@gmail.com" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 focus:border-emerald-500 focus:outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Password</label>
+            <input type="text" id="itemPassword" placeholder="Password akun..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 font-mono focus:border-emerald-500 focus:outline-none" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">URL Web / Supabase Project URL</label>
+          <input type="text" id="itemUrl" placeholder="https://xyz.supabase.co" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 focus:border-emerald-500 focus:outline-none" />
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Anon / Public API Key</label>
+          <input type="text" id="itemAnonKey" placeholder="eyJhbGciOi..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 font-mono text-xs focus:border-emerald-500 focus:outline-none" />
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Catatan Tambahan (DB URI, Service Key, dll)</label>
+          <textarea id="itemNotes" rows="2" placeholder="Catatan rahasia lainnya..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none"></textarea>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs">Batal</button>
+          <button type="submit" class="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs">Simpan Terenkripsi</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="hidden fixed bottom-5 right-5 bg-emerald-500 text-slate-950 font-semibold px-4 py-2 rounded-lg shadow-lg text-xs transition"></div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    // ==========================================
+    // 1. CONFIGURATION (GANTI DENGAN KUNCI SUPABASE KAMU)
+    // ==========================================
+    const SUPABASE_URL = "https://YOUR_PROJECT_REF.supabase.co";
+    const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // STATE IN-MEMORY
+    let currentUser = null;
+    let masterCryptoKey = null; // Disimpan HANYA di RAM browser
+    let decryptedVault = [];
+
+    // ==========================================
+    // 2. ZERO-KNOWLEDGE CRYPTO HELPERS (WEB CRYPTO)
+    // ==========================================
+    async function deriveKeyFromMasterPassword(password, salt) {
+      const enc = new TextEncoder();
+      const baseKey = await crypto.subtle.importKey(
+        "raw",
+        enc.encode(password),
+        { name: "PBKDF2" },
+        false,
+        ["deriveKey"]
+      );
+
+      return await crypto.subtle.deriveKey(
+        {
+          name: "PBKDF2",
+          salt: enc.encode(salt),
+          iterations: 100000,
+          hash: "SHA-256"
+        },
+        baseKey,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt", "decrypt"]
+      );
+    }
+
+    async function encryptPayload(payloadObj, key) {
+      const enc = new TextEncoder();
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const plaintext = JSON.stringify(payloadObj);
+
+      const ciphertextBuffer = await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv: iv },
+        key,
+        enc.encode(plaintext)
+      );
+
+      // Convert buffer ke Base64 string
+      const ciphertextBase64 = btoa(String.fromCharCode(...new Uint8Array(ciphertextBuffer)));
+      const ivBase64 = btoa(String.fromCharCode(...iv));
+
+      return { ciphertext: ciphertextBase64, iv: ivBase64 };
+    }
+
+    async function decryptPayload(ciphertextBase64, ivBase64, key) {
+      try {
+        const ciphertext = Uint8Array.from(atob(ciphertextBase64), c => c.charCodeAt(0));
+        const iv = Uint8Array.from(atob(ivBase64), c => c.charCodeAt(0));
+
+        const decryptedBuffer = await crypto.subtle.decrypt(
+          { name: "AES-GCM", iv: iv },
+          key,
+          ciphertext
+        );
+
+        const dec = new TextDecoder();
+        return JSON.parse(dec.decode(decryptedBuffer));
+      } catch (err) {
+        console.error("Gagal dekripsi payload:", err);
+        return null;
+      }
+    }
+
+    // ==========================================
+    // 3. AUTHENTICATION & MASTER PASS FLOW
+    // ==========================================
+    async function checkAuthSession() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        currentUser = session.user;
+        document.getElementById("userEmailBadge").innerText = currentUser.email;
+        document.getElementById("authSection").classList.add("hidden");
+        document.getElementById("unlockSection").classList.remove("hidden");
+      } else {
+        document.getElementById("authSection").classList.remove("hidden");
+        document.getElementById("unlockSection").classList.add("hidden");
+        document.getElementById("appSection").classList.add("hidden");
+        document.getElementById("authActions").classList.add("hidden");
+      }
+    }
+
+    async function handleAuth(e) {
+      e.preventDefault();
+      const email = document.getElementById("authEmail").value;
+      const password = document.getElementById("authPassword").value;
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return alert("Login gagal: " + error.message);
+
+      currentUser = data.user;
+      checkAuthSession();
+    }
+
+    async function handleSignUp() {
+      const email = document.getElementById("authEmail").value;
+      const password = document.getElementById("authPassword").value;
+      if (!email || !password) return alert("Isi email dan password akun terlebih dahulu.");
+
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) return alert("Pendaftaran gagal: " + error.message);
+      alert("Akun berhasil dibuat! Silakan login.");
+    }
+
+    async function handleUnlock(e) {
+      e.preventDefault();
+      const masterPass = document.getElementById("masterPasswordInput").value;
+      if (!masterPass) return;
+
+      // Gunakan user.id sebagai salt konsisten per pengguna
+      masterCryptoKey = await deriveKeyFromMasterPassword(masterPass, currentUser.id);
+
+      document.getElementById("unlockSection").classList.add("hidden");
+      document.getElementById("appSection").classList.remove("hidden");
+      document.getElementById("authActions").classList.remove("hidden");
+
+      generatePassword();
+      await fetchAndDecryptVault();
+    }
+
+    function lockVault() {
+      masterCryptoKey = null;
+      decryptedVault = [];
+      document.getElementById("masterPasswordInput").value = "";
+      document.getElementById("appSection").classList.add("hidden");
+      document.getElementById("unlockSection").classList.remove("hidden");
+      showToast("Vault berhasil dikunci.");
+    }
+
+    async function handleLogout() {
+      await supabase.auth.signOut();
+      lockVault();
+      checkAuthSession();
+    }
+
+    // ==========================================
+    // 4. VAULT CRUD & SYNC
+    // ==========================================
+    async function fetchAndDecryptVault() {
+      const { data, error } = await supabase
+        .from("vaults")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) return alert("Gagal mengambil data: " + error.message);
+
+      decryptedVault = [];
+      for (const row of data) {
+        const decryptedPayload = await decryptPayload(row.encrypted_data, row.iv, masterCryptoKey);
+        if (decryptedPayload) {
+          decryptedVault.push({
+            id: row.id,
+            title: row.title,
+            ...decryptedPayload
+          });
+        }
+      }
+
+      renderVaultList();
+      populateEnvProjectDropdown();
+    }
+
+    function renderVaultList() {
+      const container = document.getElementById("vaultList");
+      const search = (document.getElementById("searchInput").value || "").toLowerCase();
+
+      const filtered = decryptedVault.filter(item => 
+        item.title.toLowerCase().includes(search) || 
+        (item.email && item.email.toLowerCase().includes(search))
+      );
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="col-span-full py-8 text-center text-slate-500 text-sm">Tidak ada kredensial yang cocok.</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(item => `
+        <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl space-y-3 hover:border-slate-600 transition">
+          <div class="flex justify-between items-start">
+            <div>
+              <h4 class="font-bold text-white text-base">${escapeHtml(item.title)}</h4>
+              <p class="text-xs text-emerald-400 font-mono">${escapeHtml(item.email || '-')}</p>
+            </div>
+            <div class="flex gap-1.5">
+              <button onclick="copyToClipboard('${item.email}', 'Email disalin!')" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">Copy Email</button>
+              <button onclick="copyToClipboard('${item.password}', 'Password disalin!')" class="text-xs bg-emerald-600 hover:bg-emerald-500 px-2 py-1 rounded">Copy Pass</button>
+              <button onclick="deleteVaultItem('${item.id}')" class="text-xs text-rose-400 hover:text-rose-300 px-2 py-1">Hapus</button>
+            </div>
+          </div>
+          ${item.url ? `<p class="text-xs text-slate-400 truncate">🌐 ${escapeHtml(item.url)}</p>` : ''}
+          ${item.notes ? `<p class="text-xs bg-slate-900/60 p-2 rounded text-slate-300 whitespace-pre-wrap">${escapeHtml(item.notes)}</p>` : ''}
+        </div>
+      `).join('');
+    }
+
+    async function saveVaultItem(e) {
+      e.preventDefault();
+      const title = document.getElementById("itemTitle").value;
+      const payload = {
+        email: document.getElementById("itemEmail").value,
+        password: document.getElementById("itemPassword").value,
+        url: document.getElementById("itemUrl").value,
+        anonKey: document.getElementById("itemAnonKey").value,
+        notes: document.getElementById("itemNotes").value,
+      };
+
+      const { ciphertext, iv } = await encryptPayload(payload, masterCryptoKey);
+
+      const { error } = await supabase.from("vaults").insert({
+        user_id: currentUser.id,
+        title: title,
+        encrypted_data: ciphertext,
+        iv: iv
+      });
+
+      if (error) return alert("Gagal menyimpan: " + error.message);
+
+      closeModal();
+      showToast("Kredensial berhasil dienkripsi & disimpan!");
+      await fetchAndDecryptVault();
+    }
+
+    async function deleteVaultItem(id) {
+      if (!confirm("Hapus item ini dari brankas?")) return;
+      const { error } = await supabase.from("vaults").delete().eq("id", id);
+      if (error) return alert("Gagal menghapus: " + error.message);
+      await fetchAndDecryptVault();
+      showToast("Item berhasil dihapus.");
+    }
+
+    // ==========================================
+    // 5. DEV SECRETS (.ENV HELPER)
+    // ==========================================
+    function populateEnvProjectDropdown() {
+      const select = document.getElementById("envSelectProject");
+      select.innerHTML = '<option value="">-- Pilih Project --</option>';
+      decryptedVault.forEach((item, idx) => {
+        select.innerHTML += `<option value="${idx}">${item.title}</option>`;
+      });
+    }
+
+    function generateEnvSnippet() {
+      const select = document.getElementById("envSelectProject");
+      const textarea = document.getElementById("envOutput");
+      if (select.value === "") {
+        textarea.value = "";
+        return;
+      }
+
+      const item = decryptedVault[select.value];
+      textarea.value = 
+`# Credentials for ${item.title}
+VITE_SUPABASE_URL=${item.url || ''}
+VITE_SUPABASE_ANON_KEY=${item.anonKey || ''}
+APP_USER_EMAIL=${item.email || ''}
+`;
+    }
+
+    // ==========================================
+    // 6. PASSWORD GENERATOR
+    // ==========================================
+    function generatePassword() {
+      const len = parseInt(document.getElementById("genLength").value);
+      const useUpper = document.getElementById("genUpper").checked;
+      const useLower = document.getElementById("genLower").checked;
+      const useNumbers = document.getElementById("genNumbers").checked;
+      const useSymbols = document.getElementById("genSymbols").checked;
+
+      let chars = "";
+      if (useUpper) chars += "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      if (useLower) chars += "abcdefghijklmnopqrstuvwxyz";
+      if (useNumbers) chars += "0123456789";
+      if (useSymbols) chars += "!@#$%^&*()_+~`|}{[]:;?><,.-=";
+
+      if (!chars) chars = "abcdefghijklmnopqrstuvwxyz";
+
+      const arr = new Uint32Array(len);
+      crypto.getRandomValues(arr);
+      let pwd = "";
+      for (let i = 0; i < len; i++) {
+        pwd += chars[arr[i] % chars.length];
+      }
+
+      document.getElementById("genResult").value = pwd;
+    }
+
+    // ==========================================
+    // 7. UTILITIES & UI
+    // ==========================================
+    function switchTab(tabId) {
+      document.querySelectorAll(".tab-content").forEach(el => el.classList.add("hidden"));
+      document.querySelectorAll(".tab-btn").forEach(el => {
+        el.className = "tab-btn px-4 py-2 text-sm font-semibold rounded-lg text-slate-400 hover:text-white";
+      });
+
+      document.getElementById(tabId).classList.remove("hidden");
+      const activeBtn = document.getElementById("btn" + tabId.charAt(0).toUpperCase() + tabId.slice(1));
+      if (activeBtn) {
+        activeBtn.className = "tab-btn px-4 py-2 text-sm font-semibold rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30";
+      }
+    }
+
+    function openModal() {
+      document.getElementById("vaultForm").reset();
+      document.getElementById("vaultModal").classList.remove("hidden");
+    }
+
+    function closeModal() {
+      document.getElementById("vaultModal").classList.add("hidden");
+    }
+
+    function copyToClipboard(text, message) {
+      if (!text) return;
+      navigator.clipboard.writeText(text);
+      showToast(message || "Disalin ke clipboard!");
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById("toast");
+      toast.innerText = msg;
+      toast.classList.remove("hidden");
+      setTimeout(() => toast.classList.add("hidden"), 3000);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    async function exportVaultBackup() {
+      const { data } = await supabase.from("vaults").select("title, encrypted_data, iv, created_at");
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `devvault-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // Jalankan pengecekan auth saat halaman dimuat
+    checkAuthSession();
+  </script>
+</body>
+</html>
