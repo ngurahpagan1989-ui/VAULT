@@ -13,7 +13,7 @@
   <header class="bg-slate-800/80 border-b border-slate-700 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-50">
     <div class="flex items-center gap-3">
       <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-bold">
-        🛡️
+        🛡️️
       </div>
       <h1 class="text-xl font-bold tracking-tight text-white">Dev<span class="text-emerald-400">Vault</span></h1>
     </div>
@@ -62,7 +62,7 @@
         <div class="text-4xl mb-2">🔐</div>
         <h2 class="text-2xl font-bold">Buka Brankas Enkripsi</h2>
         <p class="text-xs text-slate-400 mt-1">
-          Master password dipakai lokal di browser untuk dekripsi (tidak dikirim ke Supabase).
+          Master password dipakai lokal di browser untuk dekripsi (tidak dikirim ke server).
         </p>
       </div>
 
@@ -88,7 +88,7 @@
           ⚡ Password Generator
         </button>
         <button onclick="switchTab('tabDevSecrets')" id="btnTabDevSecrets" class="tab-btn px-4 py-2 text-sm font-semibold rounded-lg text-slate-400 hover:text-white">
-          🛠️️ Dev Secrets & .env
+          🛠 Dev Secrets & .env
         </button>
         <button onclick="switchTab('tabSettings')" id="btnTabSettings" class="tab-btn px-4 py-2 text-sm font-semibold rounded-lg text-slate-400 hover:text-white">
           ⚙️ Settings
@@ -105,7 +105,7 @@
         </div>
 
         <div id="vaultList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- Items will be injected here -->
+          <!-- Items di-render via JS -->
         </div>
       </div>
 
@@ -215,21 +215,40 @@
   <!-- JAVASCRIPT LOGIC -->
   <script>
     // ==========================================
-    // 1. CONFIGURATION (GANTI DENGAN KUNCI SUPABASE KAMU)
+    // 1. CONFIGURATION
     // ==========================================
-    const SUPABASE_URL = "https://YOUR_PROJECT_REF.supabase.co";
-    const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+    const SUPABASE_URL = "https://gwclivwetiopxtxozmzs.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3Y2xpdndldGlvcXh0eG96bXpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyOTA5OTcsImV4cCI6MjEwNjg2Njk5N30.iXSFKXoa8vUqLmCOQsE2aehuhQOhVbX1zjAI-1rKYbg";
 
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // Inisialisasi Supabase Client dengan nama sbClient (tidak bentrok dengan global)
+    const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // STATE IN-MEMORY
     let currentUser = null;
-    let masterCryptoKey = null; // Disimpan HANYA di RAM browser
+    let masterCryptoKey = null; // Hanya tersimpan di RAM browser
     let decryptedVault = [];
 
     // ==========================================
-    // 2. ZERO-KNOWLEDGE CRYPTO HELPERS (WEB CRYPTO)
+    // 2. HELPER BASE64 & CRYPTO
     // ==========================================
+    function bufferToBase64(buf) {
+      let binary = '';
+      const bytes = new Uint8Array(buf);
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
+    }
+
+    function base64ToBuffer(base64) {
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes;
+    }
+
     async function deriveKeyFromMasterPassword(password, salt) {
       const enc = new TextEncoder();
       const baseKey = await crypto.subtle.importKey(
@@ -265,17 +284,16 @@
         enc.encode(plaintext)
       );
 
-      // Convert buffer ke Base64 string
-      const ciphertextBase64 = btoa(String.fromCharCode(...new Uint8Array(ciphertextBuffer)));
-      const ivBase64 = btoa(String.fromCharCode(...iv));
-
-      return { ciphertext: ciphertextBase64, iv: ivBase64 };
+      return {
+        ciphertext: bufferToBase64(ciphertextBuffer),
+        iv: bufferToBase64(iv)
+      };
     }
 
     async function decryptPayload(ciphertextBase64, ivBase64, key) {
       try {
-        const ciphertext = Uint8Array.from(atob(ciphertextBase64), c => c.charCodeAt(0));
-        const iv = Uint8Array.from(atob(ivBase64), c => c.charCodeAt(0));
+        const ciphertext = base64ToBuffer(ciphertextBase64);
+        const iv = base64ToBuffer(ivBase64);
 
         const decryptedBuffer = await crypto.subtle.decrypt(
           { name: "AES-GCM", iv: iv },
@@ -295,7 +313,7 @@
     // 3. AUTHENTICATION & MASTER PASS FLOW
     // ==========================================
     async function checkAuthSession() {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await sbClient.auth.getSession();
       if (session) {
         currentUser = session.user;
         document.getElementById("userEmailBadge").innerText = currentUser.email;
@@ -314,7 +332,7 @@
       const email = document.getElementById("authEmail").value;
       const password = document.getElementById("authPassword").value;
 
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
       if (error) return alert("Login gagal: " + error.message);
 
       currentUser = data.user;
@@ -326,9 +344,9 @@
       const password = document.getElementById("authPassword").value;
       if (!email || !password) return alert("Isi email dan password akun terlebih dahulu.");
 
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await sbClient.auth.signUp({ email, password });
       if (error) return alert("Pendaftaran gagal: " + error.message);
-      alert("Akun berhasil dibuat! Silakan login.");
+      alert("Pendaftaran berhasil! Jika verifikasi email aktif di Supabase, cek inbox emailmu. Lalu silakan login.");
     }
 
     async function handleUnlock(e) {
@@ -336,7 +354,7 @@
       const masterPass = document.getElementById("masterPasswordInput").value;
       if (!masterPass) return;
 
-      // Gunakan user.id sebagai salt konsisten per pengguna
+      // Gunakan user.id sebagai salt unik per pengguna
       masterCryptoKey = await deriveKeyFromMasterPassword(masterPass, currentUser.id);
 
       document.getElementById("unlockSection").classList.add("hidden");
@@ -357,7 +375,7 @@
     }
 
     async function handleLogout() {
-      await supabase.auth.signOut();
+      await sbClient.auth.signOut();
       lockVault();
       checkAuthSession();
     }
@@ -366,7 +384,7 @@
     // 4. VAULT CRUD & SYNC
     // ==========================================
     async function fetchAndDecryptVault() {
-      const { data, error } = await supabase
+      const { data, error } = await sbClient
         .from("vaults")
         .select("*")
         .order("created_at", { ascending: false });
@@ -411,8 +429,8 @@
               <p class="text-xs text-emerald-400 font-mono">${escapeHtml(item.email || '-')}</p>
             </div>
             <div class="flex gap-1.5">
-              <button onclick="copyToClipboard('${item.email}', 'Email disalin!')" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">Copy Email</button>
-              <button onclick="copyToClipboard('${item.password}', 'Password disalin!')" class="text-xs bg-emerald-600 hover:bg-emerald-500 px-2 py-1 rounded">Copy Pass</button>
+              <button onclick="copyToClipboard('${escapeHtml(item.email)}', 'Email disalin!')" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">Copy Email</button>
+              <button onclick="copyToClipboard('${escapeHtml(item.password)}', 'Password disalin!')" class="text-xs bg-emerald-600 hover:bg-emerald-500 px-2 py-1 rounded">Copy Pass</button>
               <button onclick="deleteVaultItem('${item.id}')" class="text-xs text-rose-400 hover:text-rose-300 px-2 py-1">Hapus</button>
             </div>
           </div>
@@ -435,7 +453,7 @@
 
       const { ciphertext, iv } = await encryptPayload(payload, masterCryptoKey);
 
-      const { error } = await supabase.from("vaults").insert({
+      const { error } = await sbClient.from("vaults").insert({
         user_id: currentUser.id,
         title: title,
         encrypted_data: ciphertext,
@@ -451,7 +469,7 @@
 
     async function deleteVaultItem(id) {
       if (!confirm("Hapus item ini dari brankas?")) return;
-      const { error } = await supabase.from("vaults").delete().eq("id", id);
+      const { error } = await sbClient.from("vaults").delete().eq("id", id);
       if (error) return alert("Gagal menghapus: " + error.message);
       await fetchAndDecryptVault();
       showToast("Item berhasil dihapus.");
@@ -464,7 +482,7 @@
       const select = document.getElementById("envSelectProject");
       select.innerHTML = '<option value="">-- Pilih Project --</option>';
       decryptedVault.forEach((item, idx) => {
-        select.innerHTML += `<option value="${idx}">${item.title}</option>`;
+        select.innerHTML += `<option value="${idx}">${escapeHtml(item.title)}</option>`;
       });
     }
 
@@ -553,11 +571,11 @@ APP_USER_EMAIL=${item.email || ''}
 
     function escapeHtml(str) {
       if (!str) return "";
-      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 
     async function exportVaultBackup() {
-      const { data } = await supabase.from("vaults").select("title, encrypted_data, iv, created_at");
+      const { data } = await sbClient.from("vaults").select("title, encrypted_data, iv, created_at");
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -567,7 +585,7 @@ APP_USER_EMAIL=${item.email || ''}
       URL.revokeObjectURL(url);
     }
 
-    // Jalankan pengecekan auth saat halaman dimuat
+    // Inisialisasi awal
     checkAuthSession();
   </script>
 </body>
