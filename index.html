@@ -97,7 +97,6 @@
 
       <!-- TAB 1: VAULT -->
       <div id="tabVault" class="tab-content space-y-4">
-        <!-- TOP ACTIONS & SEARCH -->
         <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
           <input type="text" id="searchInput" oninput="renderVaultList()" placeholder="Cari judul, email, atau catatan..." class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none flex-1 max-w-sm" />
           <button onclick="openModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition flex items-center justify-center gap-1.5">
@@ -105,32 +104,30 @@
           </button>
         </div>
 
-        <!-- CATEGORY FILTER BUTTONS -->
+        <!-- FILTER KATEGORI -->
         <div class="flex flex-wrap gap-2 pt-1 pb-2" id="categoryFilterBar">
-          <button onclick="filterCategory('all')" class="cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+          <button onclick="filterCategory('all', event)" class="cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
             Semua
           </button>
-          <button onclick="filterCategory('supabase')" class="cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-400 hover:text-white border border-slate-700">
+          <button onclick="filterCategory('supabase', event)" class="cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-400 hover:text-white border border-slate-700">
             ⚡ Supabase & DB
           </button>
-          <button onclick="filterCategory('api')" class="cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-400 hover:text-white border border-slate-700">
+          <button onclick="filterCategory('api', event)" class="cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-400 hover:text-white border border-slate-700">
             🔑 API & Webhooks
           </button>
-          <button onclick="filterCategory('email')" class="cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-400 hover:text-white border border-slate-700">
+          <button onclick="filterCategory('email', event)" class="cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-400 hover:text-white border border-slate-700">
             📧 Email & Google
           </button>
-          <button onclick="filterCategory('project')" class="cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-400 hover:text-white border border-slate-700">
+          <button onclick="filterCategory('project', event)" class="cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-400 hover:text-white border border-slate-700">
             🚀 Proyek & App
           </button>
-          <button onclick="filterCategory('general')" class="cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-400 hover:text-white border border-slate-700">
+          <button onclick="filterCategory('general', event)" class="cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-400 hover:text-white border border-slate-700">
             📦 Lainnya
           </button>
         </div>
 
-        <!-- VAULT LIST GRID -->
-        <div id="vaultList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- Items di-render via JS -->
-        </div>
+        <!-- LIST CONTAINER -->
+        <div id="vaultList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
       </div>
 
       <!-- TAB 2: GENERATOR -->
@@ -254,14 +251,14 @@
   <!-- JAVASCRIPT LOGIC -->
   <script>
     // ==========================================
-    // 1. CONFIGURATION
+    // 1. KONFIGURASI SUPABASE
     // ==========================================
     const SUPABASE_URL = "https://gwclivwetioqxtxozmzs.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3Y2xpdndldGlvcXh0eG96bXpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyOTA5OTcsImV4cCI6MjEwNjg2Njk5N30.iXSFKXoa8vUqLmCOQsE2aehuhQOhVbX1zjAI-1rKYbg";
 
     const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // STATE IN-MEMORY
+    // STATE IN-MEMORY (RAM)
     let currentUser = null;
     let masterCryptoKey = null;
     let decryptedVault = [];
@@ -276,7 +273,7 @@
     };
 
     // ==========================================
-    // 2. CRYPTO HELPERS
+    // 2. CRYPTO & BASE64 (ROBUST & CRASH-PROOF)
     // ==========================================
     function bufferToBase64(buf) {
       let binary = '';
@@ -288,12 +285,22 @@
     }
 
     function base64ToBuffer(base64) {
-      const binary = atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
+      if (!base64 || typeof base64 !== 'string') return new Uint8Array(0);
+      let clean = base64.trim().replace(/-/g, '+').replace(/_/g, '/');
+      while (clean.length % 4 !== 0) {
+        clean += '=';
       }
-      return bytes;
+      try {
+        const binary = atob(clean);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes;
+      } catch (err) {
+        console.warn("Base64 string tidak valid, dilewati:", err);
+        return new Uint8Array(0);
+      }
     }
 
     async function deriveKeyFromMasterPassword(password, salt) {
@@ -341,6 +348,7 @@
       try {
         const ciphertext = base64ToBuffer(ciphertextBase64);
         const iv = base64ToBuffer(ivBase64);
+        if (ciphertext.length === 0 || iv.length === 0) return null;
 
         const decryptedBuffer = await crypto.subtle.decrypt(
           { name: "AES-GCM", iv: iv },
@@ -351,7 +359,7 @@
         const dec = new TextDecoder();
         return JSON.parse(dec.decode(decryptedBuffer));
       } catch (err) {
-        console.error("Gagal dekripsi payload:", err);
+        console.warn("Gagal mendekripsi satu item (kemungkinan master pass beda atau corrupted):", err);
         return null;
       }
     }
@@ -427,7 +435,7 @@
     }
 
     // ==========================================
-    // 4. VAULT CRUD & CATEGORY FILTER
+    // 4. VAULT CRUD & FILTER KATEGORI
     // ==========================================
     async function fetchAndDecryptVault() {
       const { data, error } = await sbClient
@@ -454,15 +462,16 @@
       populateEnvProjectDropdown();
     }
 
-    function filterCategory(cat) {
+    function filterCategory(cat, ev) {
       selectedCategory = cat;
       const buttons = document.querySelectorAll(".cat-filter-btn");
       buttons.forEach(btn => {
         btn.className = "cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-400 hover:text-white border border-slate-700";
       });
 
-      // Highlight active button
-      event.target.className = "cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/40";
+      if (ev && ev.target) {
+        ev.target.className = "cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/40";
+      }
       renderVaultList();
     }
 
@@ -472,4 +481,195 @@
 
       const filtered = decryptedVault.filter(item => {
         const matchSearch = item.title.toLowerCase().includes(search) || 
-                            (item.email && item
+                            (item.email && item.email.toLowerCase().includes(search)) ||
+                            (item.notes && item.notes.toLowerCase().includes(search));
+        const matchCategory = (selectedCategory === 'all') || (item.category === selectedCategory);
+        return matchSearch && matchCategory;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="col-span-full py-12 text-center text-slate-500 text-sm">Tidak ada kredensial yang cocok di kategori ini.</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(item => {
+        const catInfo = CATEGORY_MAP[item.category] || CATEGORY_MAP['general'];
+        return `
+          <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl space-y-3 hover:border-slate-600 transition flex flex-col justify-between">
+            <div>
+              <div class="flex justify-between items-start gap-2 mb-1.5">
+                <span class="text-[10px] px-2 py-0.5 rounded-full border ${catInfo.color}">
+                  ${catInfo.label}
+                </span>
+                <button onclick="deleteVaultItem('${item.id}')" class="text-xs text-rose-400 hover:text-rose-300">Hapus</button>
+              </div>
+              <h4 class="font-bold text-white text-base">${escapeHtml(item.title)}</h4>
+              <p class="text-xs text-emerald-400 font-mono mt-0.5">${escapeHtml(item.email || '-')}</p>
+            </div>
+
+            <div class="space-y-2 pt-2 border-t border-slate-700/60">
+              ${item.url ? `<p class="text-xs text-slate-400 truncate">🌐 ${escapeHtml(item.url)}</p>` : ''}
+              ${item.notes ? `<p class="text-xs bg-slate-900/60 p-2 rounded text-slate-300 whitespace-pre-wrap">${escapeHtml(item.notes)}</p>` : ''}
+
+              <div class="flex gap-2 pt-1">
+                <button onclick="copyToClipboard('${escapeHtml(item.email)}', 'Email disalin!')" class="flex-1 text-xs bg-slate-700 hover:bg-slate-600 py-1.5 rounded text-center transition">Copy Email</button>
+                <button onclick="copyToClipboard('${escapeHtml(item.password)}', 'Password disalin!')" class="flex-1 text-xs bg-emerald-600 hover:bg-emerald-500 py-1.5 rounded text-white text-center transition">Copy Pass</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function saveVaultItem(e) {
+      e.preventDefault();
+      const title = document.getElementById("itemTitle").value;
+      const category = document.getElementById("itemCategory").value;
+      const payload = {
+        email: document.getElementById("itemEmail").value,
+        password: document.getElementById("itemPassword").value,
+        url: document.getElementById("itemUrl").value,
+        anonKey: document.getElementById("itemAnonKey").value,
+        notes: document.getElementById("itemNotes").value,
+      };
+
+      const { ciphertext, iv } = await encryptPayload(payload, masterCryptoKey);
+
+      const { error } = await sbClient.from("vaults").insert({
+        user_id: currentUser.id,
+        title: title,
+        category: category,
+        encrypted_data: ciphertext,
+        iv: iv
+      });
+
+      if (error) return alert("Gagal menyimpan: " + error.message);
+
+      closeModal();
+      showToast("Kredensial berhasil disimpan!");
+      await fetchAndDecryptVault();
+    }
+
+    async function deleteVaultItem(id) {
+      if (!confirm("Hapus item ini dari brankas?")) return;
+      const { error } = await sbClient.from("vaults").delete().eq("id", id);
+      if (error) return alert("Gagal menghapus: " + error.message);
+      await fetchAndDecryptVault();
+      showToast("Item berhasil dihapus.");
+    }
+
+    // ==========================================
+    // 5. DEV SECRETS (.ENV HELPER)
+    // ==========================================
+    function populateEnvProjectDropdown() {
+      const select = document.getElementById("envSelectProject");
+      select.innerHTML = '<option value="">-- Pilih Project --</option>';
+      decryptedVault.forEach((item, idx) => {
+        select.innerHTML += `<option value="${idx}">${escapeHtml(item.title)}</option>`;
+      });
+    }
+
+    function generateEnvSnippet() {
+      const select = document.getElementById("envSelectProject");
+      const textarea = document.getElementById("envOutput");
+      if (select.value === "") {
+        textarea.value = "";
+        return;
+      }
+
+      const item = decryptedVault[select.value];
+      textarea.value = 
+`# Credentials for ${item.title}
+VITE_SUPABASE_URL=${item.url || ''}
+VITE_SUPABASE_ANON_KEY=${item.anonKey || ''}
+APP_USER_EMAIL=${item.email || ''}
+`;
+    }
+
+    // ==========================================
+    // 6. PASSWORD GENERATOR
+    // ==========================================
+    function generatePassword() {
+      const len = parseInt(document.getElementById("genLength").value);
+      const useUpper = document.getElementById("genUpper").checked;
+      const useLower = document.getElementById("genLower").checked;
+      const useNumbers = document.getElementById("genNumbers").checked;
+      const useSymbols = document.getElementById("genSymbols").checked;
+
+      let chars = "";
+      if (useUpper) chars += "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      if (useLower) chars += "abcdefghijklmnopqrstuvwxyz";
+      if (useNumbers) chars += "0123456789";
+      if (useSymbols) chars += "!@#$%^&*()_+~`|}{[]:;?><,.-=";
+
+      if (!chars) chars = "abcdefghijklmnopqrstuvwxyz";
+
+      const arr = new Uint32Array(len);
+      crypto.getRandomValues(arr);
+      let pwd = "";
+      for (let i = 0; i < len; i++) {
+        pwd += chars[arr[i] % chars.length];
+      }
+
+      document.getElementById("genResult").value = pwd;
+    }
+
+    // ==========================================
+    // 7. UTILITIES & UI
+    // ==========================================
+    function switchTab(tabId) {
+      document.querySelectorAll(".tab-content").forEach(el => el.classList.add("hidden"));
+      document.querySelectorAll(".tab-btn").forEach(el => {
+        el.className = "tab-btn px-4 py-2 text-sm font-semibold rounded-lg text-slate-400 hover:text-white";
+      });
+
+      document.getElementById(tabId).classList.remove("hidden");
+      const activeBtn = document.getElementById("btn" + tabId.charAt(0).toUpperCase() + tabId.slice(1));
+      if (activeBtn) {
+        activeBtn.className = "tab-btn px-4 py-2 text-sm font-semibold rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30";
+      }
+    }
+
+    function openModal() {
+      document.getElementById("vaultForm").reset();
+      document.getElementById("vaultModal").classList.remove("hidden");
+    }
+
+    function closeModal() {
+      document.getElementById("vaultModal").classList.add("hidden");
+    }
+
+    function copyToClipboard(text, message) {
+      if (!text) return;
+      navigator.clipboard.writeText(text);
+      showToast(message || "Disalin ke clipboard!");
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById("toast");
+      toast.innerText = msg;
+      toast.classList.remove("hidden");
+      setTimeout(() => toast.classList.add("hidden"), 3000);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    async function exportVaultBackup() {
+      const { data } = await sbClient.from("vaults").select("title, category, encrypted_data, iv, created_at");
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `devvault-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // Jalankan sesi auth saat web dibuka
+    checkAuthSession();
+  </script>
+</body>
+</html>
