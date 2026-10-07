@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DevVault - Zero-Knowledge Secrets Manager</title>
+  <title>DevVault - Zero-Knowledge Password & Secrets Manager</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -31,7 +31,7 @@
   <!-- MAIN CONTAINER -->
   <main class="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6">
 
-    <!-- STEP 1: LOGIN / REGISTER SUPABASE AUTH -->
+    <!-- STEP 1: AUTHENTICATION -->
     <section id="authSection" class="max-w-md mx-auto my-12 bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-xl">
       <h2 class="text-2xl font-bold text-center mb-2">Masuk ke DevVault</h2>
       <p class="text-xs text-slate-400 text-center mb-6">Autentikasi akun via Supabase</p>
@@ -62,7 +62,7 @@
         <div class="text-4xl mb-2">🔐</div>
         <h2 class="text-2xl font-bold">Buka Brankas Enkripsi</h2>
         <p class="text-xs text-slate-400 mt-1">
-          Master password dipakai lokal di browser untuk dekripsi (tidak dikirim ke server).
+          Master password diproses di browser untuk dekripsi (Zero-Knowledge).
         </p>
       </div>
 
@@ -82,48 +82,39 @@
       <!-- NAVIGATION TABS -->
       <nav class="flex border-b border-slate-700 gap-2 pb-2">
         <button onclick="switchTab('tabVault')" id="btnTabVault" class="tab-btn px-4 py-2 text-sm font-semibold rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-          📦 Vault
+          📦 Semua Vault
         </button>
         <button onclick="switchTab('tabGenerator')" id="btnTabGenerator" class="tab-btn px-4 py-2 text-sm font-semibold rounded-lg text-slate-400 hover:text-white">
-          ⚡ Password Generator
+          ⚡ Generator Password
         </button>
         <button onclick="switchTab('tabDevSecrets')" id="btnTabDevSecrets" class="tab-btn px-4 py-2 text-sm font-semibold rounded-lg text-slate-400 hover:text-white">
-          🛠 Dev Secrets & .env
+          🛠 Dev .env Helper
         </button>
         <button onclick="switchTab('tabSettings')" id="btnTabSettings" class="tab-btn px-4 py-2 text-sm font-semibold rounded-lg text-slate-400 hover:text-white">
-          ⚙️ Settings
+          ⚙️ Pengaturan
         </button>
       </nav>
 
       <!-- TAB 1: VAULT -->
       <div id="tabVault" class="tab-content space-y-4">
         <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
-          <input type="text" id="searchInput" oninput="renderVaultList()" placeholder="Cari judul, email, atau catatan..." class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none flex-1 max-w-sm" />
+          <div class="flex gap-2 flex-1 max-w-md">
+            <input type="text" id="searchInput" oninput="renderVaultList()" placeholder="Cari akun, username, email, URL..." class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none w-full" />
+            <!-- SAFETY LOCK TOGGLE (KUNCI ANTI SALAH PENCET) -->
+            <button onclick="toggleActionLock()" id="safetyLockBtn" class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition shrink-0 bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20" title="Klik untuk mengaktifkan/menonaktifkan tombol Edit & Hapus">
+              <span id="safetyLockIcon">🔒</span>
+              <span id="safetyLockText" class="hidden sm:inline">Mode Aman</span>
+            </button>
+          </div>
+
           <button onclick="openModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition flex items-center justify-center gap-1.5">
-            <span>+</span> Tambah Kredensial
+            <span>+</span> Tambah Akun
           </button>
         </div>
 
-        <!-- FILTER KATEGORI -->
-        <div class="flex flex-wrap gap-2 pt-1 pb-2" id="categoryFilterBar">
-          <button onclick="filterCategory('all', event)" class="cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
-            Semua
-          </button>
-          <button onclick="filterCategory('supabase', event)" class="cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-400 hover:text-white border border-slate-700">
-            ⚡ Supabase & DB
-          </button>
-          <button onclick="filterCategory('api', event)" class="cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-400 hover:text-white border border-slate-700">
-            🔑 API & Webhooks
-          </button>
-          <button onclick="filterCategory('email', event)" class="cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-400 hover:text-white border border-slate-700">
-            📧 Email & Google
-          </button>
-          <button onclick="filterCategory('project', event)" class="cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-400 hover:text-white border border-slate-700">
-            🚀 Proyek & App
-          </button>
-          <button onclick="filterCategory('general', event)" class="cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-400 hover:text-white border border-slate-700">
-            📦 Lainnya
-          </button>
+        <!-- FILTER FOLDER BEBAS DINAMIS -->
+        <div class="flex flex-wrap gap-2 pt-1 pb-2 items-center" id="dynamicFolderFilterBar">
+          <!-- Tombol kategori dinamis akan muncul otomatis di sini -->
         </div>
 
         <!-- LIST CONTAINER -->
@@ -136,7 +127,7 @@
         <div class="flex gap-2">
           <input type="text" id="genResult" readonly class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono text-emerald-400" />
           <button onclick="copyToClipboard(document.getElementById('genResult').value, 'Password disalin!')" class="bg-slate-700 hover:bg-slate-600 text-xs px-3 rounded-lg">Copy</button>
-          <button onclick="generatePassword()" class="bg-emerald-600 hover:bg-emerald-500 text-xs px-3 rounded-lg">Re-roll</button>
+          <button onclick="generatePassword()" class="bg-emerald-600 hover:bg-emerald-500 text-xs px-3 rounded-lg">Buat Ulang</button>
         </div>
         <div class="space-y-3 text-sm">
           <div class="flex justify-between items-center">
@@ -152,12 +143,12 @@
 
       <!-- TAB 3: DEV SECRETS (.ENV HELPER) -->
       <div id="tabDevSecrets" class="tab-content hidden max-w-2xl mx-auto bg-slate-800 p-6 rounded-2xl border border-slate-700 space-y-4">
-        <h3 class="text-lg font-bold">Pilih Kredensial Proyek untuk Export ke .env</h3>
-        <p class="text-xs text-slate-400">Pilih item vault yang memiliki URL dan API Keys untuk di-generate otomatis ke format .env</p>
+        <h3 class="text-lg font-bold">Export Proyek Dev ke .env</h3>
+        <p class="text-xs text-slate-400">Pilih akun proyek koding untuk di-generate otomatis ke variabel environment</p>
         <select id="envSelectProject" onchange="generateEnvSnippet()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none">
-          <option value="">-- Pilih Project --</option>
+          <option value="">-- Pilih Akun Proyek --</option>
         </select>
-        <textarea id="envOutput" readonly rows="6" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs font-mono text-emerald-300" placeholder="Pilih project di atas untuk melihat isi .env..."></textarea>
+        <textarea id="envOutput" readonly rows="6" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs font-mono text-emerald-300" placeholder="Pilih akun di atas untuk melihat isi variabel .env..."></textarea>
         <button onclick="copyToClipboard(document.getElementById('envOutput').value, 'Format .env disalin!')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition">
           Copy Format .env
         </button>
@@ -166,21 +157,21 @@
       <!-- TAB 4: SETTINGS -->
       <div id="tabSettings" class="tab-content hidden max-w-lg mx-auto bg-slate-800 p-6 rounded-2xl border border-slate-700 space-y-6">
         <div>
-          <h3 class="text-lg font-bold">Settings & Keamanan</h3>
+          <h3 class="text-lg font-bold">Pengaturan & Cadangan</h3>
           <p class="text-xs text-slate-400">Kelola brankas lokal dan backup data</p>
         </div>
         <div class="space-y-4">
           <div class="flex items-center justify-between p-4 bg-slate-900/60 rounded-xl border border-slate-700/60">
             <div>
               <p class="text-sm font-semibold">Kunci Vault Sekarang</p>
-              <p class="text-xs text-slate-400">Hapus kunci enkripsi dari RAM browser</p>
+              <p class="text-xs text-slate-400">Hapus kunci enkripsi dari memori browser</p>
             </div>
             <button onclick="lockVault()" class="bg-amber-600 hover:bg-amber-500 text-white text-xs px-3 py-2 rounded-lg">Kunci</button>
           </div>
           <div class="flex items-center justify-between p-4 bg-slate-900/60 rounded-xl border border-slate-700/60">
             <div>
-              <p class="text-sm font-semibold">Backup Vault (Encrypted JSON)</p>
-              <p class="text-xs text-slate-400">Download ciphertext aman untuk cadangan</p>
+              <p class="text-sm font-semibold">Unduh Cadangan (JSON Terenkripsi)</p>
+              <p class="text-xs text-slate-400">Simpan salinan cadangan data aman di laptop</p>
             </div>
             <button onclick="exportVaultBackup()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs px-3 py-2 rounded-lg">Download</button>
           </div>
@@ -193,53 +184,54 @@
   <!-- MODAL ADD / EDIT VAULT ITEM -->
   <div id="vaultModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
     <div class="bg-slate-800 border border-slate-700 max-w-lg w-full rounded-2xl p-6 space-y-4 shadow-2xl">
-      <h3 id="modalTitle" class="text-lg font-bold">Tambah Kredensial Baru</h3>
+      <div class="flex justify-between items-center">
+        <h3 id="modalTitle" class="text-lg font-bold">Tambah Akun Baru</h3>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
       <form id="vaultForm" onsubmit="saveVaultItem(event)" class="space-y-3 text-sm">
         <input type="hidden" id="itemId" />
         
-        <div class="grid grid-cols-3 gap-2">
-          <div class="col-span-2">
-            <label class="block text-xs text-slate-400 mb-1">Judul / Nama Proyek</label>
-            <input type="text" id="itemTitle" required placeholder="Misal: Kios POS" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 focus:border-emerald-500 focus:outline-none" />
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div class="sm:col-span-2">
+            <label class="block text-xs text-slate-400 mb-1">Nama Layanan / Akun</label>
+            <input type="text" id="itemTitle" required placeholder="Contoh: Instagram, Gmail Utama, Tokopedia, Supabase POS" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 focus:border-emerald-500 focus:outline-none" />
           </div>
           <div>
-            <label class="block text-xs text-slate-400 mb-1">Kategori</label>
-            <select id="itemCategory" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-2 text-xs focus:border-emerald-500 focus:outline-none">
-              <option value="supabase">⚡ Supabase & DB</option>
-              <option value="api">🔑 API & Token</option>
-              <option value="email">📧 Email & Google</option>
-              <option value="project">🚀 Proyek & App</option>
-              <option value="general" selected>📦 Lainnya</option>
-            </select>
+            <label class="block text-xs text-slate-400 mb-1">Folder / Tag</label>
+            <input type="text" id="itemCategory" list="categoryDatalist" placeholder="Ketik/Pilih..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-2 text-xs focus:border-emerald-500 focus:outline-none" />
+            <datalist id="categoryDatalist">
+              <!-- Rekomendasi folder otomatis di-generate via JS -->
+            </datalist>
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <div>
-            <label class="block text-xs text-slate-400 mb-1">Email / Username</label>
-            <input type="text" id="itemEmail" placeholder="nama+pos@gmail.com" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 focus:border-emerald-500 focus:outline-none" />
+            <label class="block text-xs text-slate-400 mb-1">Username / Email / HP</label>
+            <input type="text" id="itemEmail" placeholder="username atau email..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 focus:border-emerald-500 focus:outline-none" />
           </div>
           <div>
             <label class="block text-xs text-slate-400 mb-1">Password</label>
-            <input type="text" id="itemPassword" placeholder="Password akun..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 font-mono focus:border-emerald-500 focus:outline-none" />
+            <input type="text" id="itemPassword" placeholder="Kata sandi akun..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 font-mono focus:border-emerald-500 focus:outline-none" />
           </div>
         </div>
 
         <div>
-          <label class="block text-xs text-slate-400 mb-1">URL Web / Supabase Project URL</label>
-          <input type="text" id="itemUrl" placeholder="https://xyz.supabase.co" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 focus:border-emerald-500 focus:outline-none" />
+          <label class="block text-xs text-slate-400 mb-1">Website / Alamat URL Login</label>
+          <input type="text" id="itemUrl" placeholder="https://..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 focus:border-emerald-500 focus:outline-none" />
         </div>
         <div>
-          <label class="block text-xs text-slate-400 mb-1">Anon / Public API Key</label>
-          <input type="text" id="itemAnonKey" placeholder="eyJhbGciOi..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 font-mono text-xs focus:border-emerald-500 focus:outline-none" />
+          <label class="block text-xs text-slate-400 mb-1">PIN / Extra Key / Token (Opsional)</label>
+          <input type="text" id="itemAnonKey" placeholder="PIN transaksi, Anon Key, atau kode backup 2FA" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 font-mono text-xs focus:border-emerald-500 focus:outline-none" />
         </div>
         <div>
-          <label class="block text-xs text-slate-400 mb-1">Catatan Tambahan (DB URI, Service Key, dll)</label>
-          <textarea id="itemNotes" rows="2" placeholder="Catatan rahasia lainnya..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none"></textarea>
+          <label class="block text-xs text-slate-400 mb-1">Catatan Tambahan</label>
+          <textarea id="itemNotes" rows="2" placeholder="Pertanyaan keamanan, nomor pemulihan, dll..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none"></textarea>
         </div>
         <div class="flex justify-end gap-2 pt-2">
           <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs">Batal</button>
-          <button type="submit" class="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs">Simpan Terenkripsi</button>
+          <button type="submit" id="btnModalSubmit" class="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs">Simpan Terenkripsi</button>
         </div>
       </form>
     </div>
@@ -258,22 +250,15 @@
 
     const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // STATE IN-MEMORY (RAM)
+    // STATE IN-MEMORY
     let currentUser = null;
     let masterCryptoKey = null;
     let decryptedVault = [];
     let selectedCategory = 'all';
-
-    const CATEGORY_MAP = {
-      'supabase': { label: '⚡ Supabase & DB', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
-      'api': { label: '🔑 API & Token', color: 'bg-purple-500/10 text-purple-400 border-purple-500/30' },
-      'email': { label: '📧 Email & Google', color: 'bg-blue-500/10 text-blue-400 border-blue-500/30' },
-      'project': { label: '🚀 Proyek & App', color: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
-      'general': { label: '📦 Lainnya', color: 'bg-slate-700/60 text-slate-300 border-slate-600' }
-    };
+    let isActionUnlocked = false; // Mode Aman aktif secara default (Anti Salah Pencet)
 
     // ==========================================
-    // 2. CRYPTO & BASE64 (ROBUST & CRASH-PROOF)
+    // 2. CRYPTO & BASE64 ROBUST
     // ==========================================
     function bufferToBase64(buf) {
       let binary = '';
@@ -298,7 +283,7 @@
         }
         return bytes;
       } catch (err) {
-        console.warn("Base64 string tidak valid, dilewati:", err);
+        console.warn("Base64 string tidak valid:", err);
         return new Uint8Array(0);
       }
     }
@@ -359,7 +344,6 @@
         const dec = new TextDecoder();
         return JSON.parse(dec.decode(decryptedBuffer));
       } catch (err) {
-        console.warn("Gagal mendekripsi satu item (kemungkinan master pass beda atau corrupted):", err);
         return null;
       }
     }
@@ -422,6 +406,7 @@
     function lockVault() {
       masterCryptoKey = null;
       decryptedVault = [];
+      isActionUnlocked = false;
       document.getElementById("masterPasswordInput").value = "";
       document.getElementById("appSection").classList.add("hidden");
       document.getElementById("unlockSection").classList.remove("hidden");
@@ -435,7 +420,7 @@
     }
 
     // ==========================================
-    // 4. VAULT CRUD & FILTER KATEGORI
+    // 4. VAULT CRUD, EDIT & SAFETY LOCK
     // ==========================================
     async function fetchAndDecryptVault() {
       const { data, error } = await sbClient
@@ -452,14 +437,67 @@
           decryptedVault.push({
             id: row.id,
             title: row.title,
-            category: row.category || 'general',
+            category: (row.category && row.category.trim()) ? row.category.trim() : 'Umum',
             ...decryptedPayload
           });
         }
       }
 
+      updateFolderDatalistAndFilters();
       renderVaultList();
       populateEnvProjectDropdown();
+    }
+
+    // SAKELAR MODE AMAN (ANTI SALAH PENCET)
+    function toggleActionLock() {
+      isActionUnlocked = !isActionUnlocked;
+      const btn = document.getElementById("safetyLockBtn");
+      const icon = document.getElementById("safetyLockIcon");
+      const text = document.getElementById("safetyLockText");
+
+      if (isActionUnlocked) {
+        btn.className = "flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition shrink-0 bg-amber-500/20 border-amber-500/40 text-amber-300 hover:bg-amber-500/30";
+        icon.innerText = "🔓";
+        text.innerText = "Mode Kelola Aktif";
+        showToast("Mode Kelola aktif: Tombol Edit & Hapus kini bisa diklik.");
+      } else {
+        btn.className = "flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition shrink-0 bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20";
+        icon.innerText = "🔒";
+        text.innerText = "Mode Aman";
+        showToast("Mode Aman aktif: Tombol Edit & Hapus dikunci.");
+      }
+
+      renderVaultList();
+    }
+
+    // GENERATE FOLDER OPTIONS & FILTER PILLS SECARA OTOMATIS
+    function updateFolderDatalistAndFilters() {
+      // 1. Ambil folder unik
+      const uniqueCats = Array.from(new Set(decryptedVault.map(item => item.category))).filter(Boolean).sort();
+
+      // 2. Update Datalist autocomplete
+      const datalist = document.getElementById("categoryDatalist");
+      datalist.innerHTML = uniqueCats.map(cat => `<option value="${escapeHtml(cat)}"></option>`).join('');
+
+      // 3. Update Bar Tombol Filter
+      const bar = document.getElementById("dynamicFolderFilterBar");
+      let html = `
+        <button onclick="filterCategory('all', event)" class="cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg ${selectedCategory === 'all' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'}">
+          Semua (${decryptedVault.length})
+        </button>
+      `;
+
+      uniqueCats.forEach(cat => {
+        const count = decryptedVault.filter(item => item.category === cat).length;
+        const isActive = (selectedCategory === cat);
+        html += `
+          <button onclick="filterCategory('${escapeHtml(cat)}', event)" class="cat-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg ${isActive ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'}">
+            📁 ${escapeHtml(cat)} (${count})
+          </button>
+        `;
+      });
+
+      bar.innerHTML = html;
     }
 
     function filterCategory(cat, ev) {
@@ -482,49 +520,95 @@
       const filtered = decryptedVault.filter(item => {
         const matchSearch = item.title.toLowerCase().includes(search) || 
                             (item.email && item.email.toLowerCase().includes(search)) ||
-                            (item.notes && item.notes.toLowerCase().includes(search));
+                            (item.notes && item.notes.toLowerCase().includes(search)) ||
+                            (item.category && item.category.toLowerCase().includes(search));
         const matchCategory = (selectedCategory === 'all') || (item.category === selectedCategory);
         return matchSearch && matchCategory;
       });
 
       if (filtered.length === 0) {
-        container.innerHTML = `<div class="col-span-full py-12 text-center text-slate-500 text-sm">Tidak ada kredensial yang cocok di kategori ini.</div>`;
+        container.innerHTML = `<div class="col-span-full py-12 text-center text-slate-500 text-sm">Tidak ada akun yang tersimpan di filter ini.</div>`;
         return;
       }
 
-      container.innerHTML = filtered.map(item => {
-        const catInfo = CATEGORY_MAP[item.category] || CATEGORY_MAP['general'];
-        return `
-          <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl space-y-3 hover:border-slate-600 transition flex flex-col justify-between">
-            <div>
-              <div class="flex justify-between items-start gap-2 mb-1.5">
-                <span class="text-[10px] px-2 py-0.5 rounded-full border ${catInfo.color}">
-                  ${catInfo.label}
-                </span>
-                <button onclick="deleteVaultItem('${item.id}')" class="text-xs text-rose-400 hover:text-rose-300">Hapus</button>
-              </div>
-              <h4 class="font-bold text-white text-base">${escapeHtml(item.title)}</h4>
-              <p class="text-xs text-emerald-400 font-mono mt-0.5">${escapeHtml(item.email || '-')}</p>
+      container.innerHTML = filtered.map(item => `
+        <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl space-y-3 hover:border-slate-600 transition flex flex-col justify-between">
+          <div>
+            <div class="flex justify-between items-start gap-2 mb-1.5">
+              <span class="text-[10px] px-2.5 py-0.5 rounded-full border bg-slate-700/60 text-emerald-400 border-slate-600 font-mono">
+                📁 ${escapeHtml(item.category)}
+              </span>
+              
+              <!-- TOMBOL EDIT & HAPUS HANYA MUNCUL DI MODE KELOLA (ANTI SALAH PENCET) -->
+              ${isActionUnlocked ? `
+                <div class="flex items-center gap-2">
+                  <button onclick="openModal('${item.id}')" class="text-xs text-amber-400 hover:text-amber-300 font-medium">Edit</button>
+                  <span class="text-slate-600 text-xs">|</span>
+                  <button onclick="deleteVaultItem('${item.id}', '${escapeHtml(item.title)}')" class="text-xs text-rose-400 hover:text-rose-300 font-medium">Hapus</button>
+                </div>
+              ` : `
+                <span class="text-[10px] text-slate-500 flex items-center gap-1" title="Aktifkan Mode Kelola di atas untuk edit/hapus">🔒 Terkunci</span>
+              `}
             </div>
 
-            <div class="space-y-2 pt-2 border-t border-slate-700/60">
-              ${item.url ? `<p class="text-xs text-slate-400 truncate">🌐 ${escapeHtml(item.url)}</p>` : ''}
-              ${item.notes ? `<p class="text-xs bg-slate-900/60 p-2 rounded text-slate-300 whitespace-pre-wrap">${escapeHtml(item.notes)}</p>` : ''}
+            <h4 class="font-bold text-white text-base">${escapeHtml(item.title)}</h4>
+            <p class="text-xs text-emerald-400 font-mono mt-0.5">${escapeHtml(item.email || '-')}</p>
+          </div>
 
-              <div class="flex gap-2 pt-1">
-                <button onclick="copyToClipboard('${escapeHtml(item.email)}', 'Email disalin!')" class="flex-1 text-xs bg-slate-700 hover:bg-slate-600 py-1.5 rounded text-center transition">Copy Email</button>
-                <button onclick="copyToClipboard('${escapeHtml(item.password)}', 'Password disalin!')" class="flex-1 text-xs bg-emerald-600 hover:bg-emerald-500 py-1.5 rounded text-white text-center transition">Copy Pass</button>
-              </div>
+          <div class="space-y-2 pt-2 border-t border-slate-700/60">
+            ${item.url ? `<p class="text-xs text-slate-400 truncate">🔗 <a href="${escapeHtml(item.url)}" target="_blank" class="hover:underline">${escapeHtml(item.url)}</a></p>` : ''}
+            ${item.anonKey ? `<p class="text-[11px] font-mono text-purple-300 bg-slate-900/40 px-2 py-1 rounded truncate">🔑 ${escapeHtml(item.anonKey)}</p>` : ''}
+            ${item.notes ? `<p class="text-xs bg-slate-900/60 p-2 rounded text-slate-300 whitespace-pre-wrap">${escapeHtml(item.notes)}</p>` : ''}
+
+            <div class="flex gap-2 pt-1">
+              <button onclick="copyToClipboard('${escapeHtml(item.email)}', 'User/Email disalin!')" class="flex-1 text-xs bg-slate-700 hover:bg-slate-600 py-1.5 rounded text-center transition">Copy User/Email</button>
+              <button onclick="copyToClipboard('${escapeHtml(item.password)}', 'Password disalin!')" class="flex-1 text-xs bg-emerald-600 hover:bg-emerald-500 py-1.5 rounded text-white text-center transition">Copy Pass</button>
             </div>
           </div>
-        `;
-      }).join('');
+        </div>
+      `).join('');
+    }
+
+    // MODAL TAMBAH & EDIT (MENGGUNAKAN FORM YANG SAMA)
+    function openModal(editId = null) {
+      const form = document.getElementById("vaultForm");
+      form.reset();
+
+      if (editId) {
+        // Mode Edit
+        const item = decryptedVault.find(i => i.id === editId);
+        if (!item) return;
+
+        document.getElementById("modalTitle").innerText = "Edit Kredensial";
+        document.getElementById("btnModalSubmit").innerText = "Simpan Perubahan";
+        document.getElementById("itemId").value = item.id;
+        document.getElementById("itemTitle").value = item.title;
+        document.getElementById("itemCategory").value = item.category;
+        document.getElementById("itemEmail").value = item.email || '';
+        document.getElementById("itemPassword").value = item.password || '';
+        document.getElementById("itemUrl").value = item.url || '';
+        document.getElementById("itemAnonKey").value = item.anonKey || '';
+        document.getElementById("itemNotes").value = item.notes || '';
+      } else {
+        // Mode Tambah Baru
+        document.getElementById("modalTitle").innerText = "Tambah Akun Baru";
+        document.getElementById("btnModalSubmit").innerText = "Simpan Terenkripsi";
+        document.getElementById("itemId").value = "";
+      }
+
+      document.getElementById("vaultModal").classList.remove("hidden");
+    }
+
+    function closeModal() {
+      document.getElementById("vaultModal").classList.add("hidden");
     }
 
     async function saveVaultItem(e) {
       e.preventDefault();
+      const itemId = document.getElementById("itemId").value;
       const title = document.getElementById("itemTitle").value;
-      const category = document.getElementById("itemCategory").value;
+      const category = document.getElementById("itemCategory").value.trim() || 'Umum';
+
       const payload = {
         email: document.getElementById("itemEmail").value,
         password: document.getElementById("itemPassword").value,
@@ -535,27 +619,49 @@
 
       const { ciphertext, iv } = await encryptPayload(payload, masterCryptoKey);
 
-      const { error } = await sbClient.from("vaults").insert({
-        user_id: currentUser.id,
-        title: title,
-        category: category,
-        encrypted_data: ciphertext,
-        iv: iv
-      });
+      if (itemId) {
+        // UPDATE ITEM LAMA
+        const { error } = await sbClient.from("vaults").update({
+          title: title,
+          category: category,
+          encrypted_data: ciphertext,
+          iv: iv,
+          updated_at: new Date().toISOString()
+        }).eq("id", itemId);
 
-      if (error) return alert("Gagal menyimpan: " + error.message);
+        if (error) return alert("Gagal mengupdate: " + error.message);
+        showToast("Perubahan kredensial berhasil disimpan!");
+      } else {
+        // INSERT ITEM BARU
+        const { error } = await sbClient.from("vaults").insert({
+          user_id: currentUser.id,
+          title: title,
+          category: category,
+          encrypted_data: ciphertext,
+          iv: iv
+        });
+
+        if (error) return alert("Gagal menyimpan: " + error.message);
+        showToast("Akun baru berhasil dienkripsi & disimpan!");
+      }
 
       closeModal();
-      showToast("Kredensial berhasil disimpan!");
       await fetchAndDecryptVault();
     }
 
-    async function deleteVaultItem(id) {
-      if (!confirm("Hapus item ini dari brankas?")) return;
+    async function deleteVaultItem(id, title) {
+      if (!isActionUnlocked) {
+        return alert("Aktifkan 'Mode Kelola' terlebih dahulu untuk menghapus data!");
+      }
+
+      const confirmDelete = confirm(`Apakah kamu yakin ingin menghapus akun "${title}"?\n\nTindakan ini tidak dapat dibatalkan!`);
+      if (!confirmDelete) return;
+
       const { error } = await sbClient.from("vaults").delete().eq("id", id);
       if (error) return alert("Gagal menghapus: " + error.message);
+
+      showToast("Akun berhasil dihapus.");
       await fetchAndDecryptVault();
-      showToast("Item berhasil dihapus.");
     }
 
     // ==========================================
@@ -563,7 +669,7 @@
     // ==========================================
     function populateEnvProjectDropdown() {
       const select = document.getElementById("envSelectProject");
-      select.innerHTML = '<option value="">-- Pilih Project --</option>';
+      select.innerHTML = '<option value="">-- Pilih Akun Proyek --</option>';
       decryptedVault.forEach((item, idx) => {
         select.innerHTML += `<option value="${idx}">${escapeHtml(item.title)}</option>`;
       });
@@ -580,9 +686,9 @@
       const item = decryptedVault[select.value];
       textarea.value = 
 `# Credentials for ${item.title}
-VITE_SUPABASE_URL=${item.url || ''}
-VITE_SUPABASE_ANON_KEY=${item.anonKey || ''}
-APP_USER_EMAIL=${item.email || ''}
+VITE_PROJECT_URL=${item.url || ''}
+VITE_API_KEY=${item.anonKey || ''}
+AUTH_ACCOUNT_EMAIL=${item.email || ''}
 `;
     }
 
@@ -630,15 +736,6 @@ APP_USER_EMAIL=${item.email || ''}
       }
     }
 
-    function openModal() {
-      document.getElementById("vaultForm").reset();
-      document.getElementById("vaultModal").classList.remove("hidden");
-    }
-
-    function closeModal() {
-      document.getElementById("vaultModal").classList.add("hidden");
-    }
-
     function copyToClipboard(text, message) {
       if (!text) return;
       navigator.clipboard.writeText(text);
@@ -668,7 +765,7 @@ APP_USER_EMAIL=${item.email || ''}
       URL.revokeObjectURL(url);
     }
 
-    // Jalankan sesi auth saat web dibuka
+    // Jalankan sesi auth saat web dimuat
     checkAuthSession();
   </script>
 </body>
